@@ -160,7 +160,7 @@ def getRetroPos(img, display=False, sample=False):
                     for tape in pair:
                         img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 0, 255))
 
-        return (x / (screenSize[0]/2))-1, img
+        return -(x / (screenSize[0]/2))-1, img
     return None, img
 
 if __name__ == "__main__":
