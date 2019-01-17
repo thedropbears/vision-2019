@@ -142,25 +142,26 @@ def getRetroPos(img, display=False, sample=False):
                 if leftRect:
                     pairs.append((leftRect, rect))
 
-        closestToMiddle = min(pairs, key = lambda x:abs(x[0][0][0] - screenSize[0]/2))
+        if pairs:
+            closestToMiddle = min(pairs, key = lambda x:abs(x[0][0][0] - screenSize[0]/2))
 
-        if display == True: #Create the annotated display if display is True
-            for pair in pairs:
-                if pair == closestToMiddle:
-                    for tape in pair:
-                        img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 255, 0))
-                    circleContours = list(np.int0(cv2.boxPoints(pair[0])))
-                    circleContours.extend(list(np.int0(cv2.boxPoints(pair[1]))))
-                    circleContours = np.array(circleContours)
-                    (x,y),radius = cv2.minEnclosingCircle(circleContours)
-                    radius = int(radius)
-                    center = (int(x), int(y))
-                    img = cv2.circle(img, center, radius, (0, 255, 0, 2))
-                else:
-                    for tape in pair:
-                        img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 0, 255))
+            if display == True: #Create the annotated display if display is True
+                for pair in pairs:
+                    if pair == closestToMiddle:
+                        for tape in pair:
+                            img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 255, 0))
+                        circleContours = list(np.int0(cv2.boxPoints(pair[0])))
+                        circleContours.extend(list(np.int0(cv2.boxPoints(pair[1]))))
+                        circleContours = np.array(circleContours)
+                        (x,y),radius = cv2.minEnclosingCircle(circleContours)
+                        radius = int(radius)
+                        center = (int(x), int(y))
+                        img = cv2.circle(img, center, radius, (0, 255, 0))
+                    else:
+                        for tape in pair:
+                            img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 0, 255))
 
-        return -(x / (screenSize[0]/2))-1, img
+            return -((x / (screenSize[0]/2))-1), img
     return None, img
 
 if __name__ == "__main__":
@@ -197,4 +198,3 @@ if __name__ == "__main__":
         source.putFrame(image)
         entry.setNumber(percent)
         NetworkTables.flush()
-
