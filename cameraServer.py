@@ -13,8 +13,8 @@ from networktables import NetworkTables
 #Magic Numbers
 lowerGreen = (38, 125, 100) #Our Robot's Camera
 higherGreen = (52, 255, 165)
-#lowerGreen = (30, 177, 80) #FRC sample images
-#higherGreen = (150, 255, 255)
+sample_lowerGreen = (30, 177, 80) #FRC sample images
+sample_higherGreen = (150, 255, 255)
 minContourArea = 10
 angleOffset = 13
 rightAngleSize = -14.5
@@ -116,9 +116,12 @@ def startCamera(config):
 
 #Process Functions
 
-def getRetroPos(img, display=False):
+def getRetroPos(img, display=False, sample=False):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV) #Convert to HSV to make the mask easier
-    mask = cv2.inRange(hsv, lowerGreen, higherGreen) #Create a mask of everything in between the greens
+    if sample:
+        mask = cv2.inRange(hsv, sample_lowerGreen, sample_higherGreen) #Create a mask of everything in between the greens
+    else:
+        mask = cv2.inRange(hsv, lowerGreen, higherGreen)
     mask = cv2.dilate(mask, None, iterations=2) #Expand the mask to allow for further away tape
 
     contours = cv2.findContours(mask, 1, 2)[-2] #Find the contours
@@ -157,10 +160,8 @@ def getRetroPos(img, display=False):
                     for tape in pair:
                         img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 0, 255))
 
-        return (x / (screenSize[1]/2))-1, img
+        return (x / (screenSize[0]/2))-1, img
     return None, img
-
-
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2:
@@ -196,3 +197,4 @@ if __name__ == "__main__":
         source.putFrame(image)
         entry.setNumber(percent)
         NetworkTables.flush()
+
