@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import json
 import time
 import sys
@@ -7,14 +6,13 @@ import numpy as np
 import cv2
 import math
 
-from cscore import CameraServer, VideoSource
-from networktables import NetworkTables
-
 #Magic Numbers
 lowerGreen = (38, 125, 100) #Our Robot's Camera
-higherGreen = (52, 255, 165)
+higherGreen = (52, 255, 180)
 sample_lowerGreen = (30, 177, 80) #FRC sample images
 sample_higherGreen = (150, 255, 255)
+lowerTapeColour = (0, 0, 0) #TODO: Ground Tape filter colours
+upperTapeColour = (360, 255, 255) #TODO: Ground Tape filter colours 
 minContourArea = 10
 angleOffset = 13
 rightAngleSize = -14.5
@@ -117,6 +115,7 @@ def startCamera(config):
 #Process Functions
 
 def getRetroPos(img, display=False, sample=False):
+    """Function for finding retro-reflective tape a"""
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV) #Convert to HSV to make the mask easier
     if sample:
         mask = cv2.inRange(hsv, sample_lowerGreen, sample_higherGreen) #Create a mask of everything in between the greens
@@ -141,30 +140,43 @@ def getRetroPos(img, display=False, sample=False):
             elif rect[2] < (rightAngleSize + angleOffset) and rect[2] > (rightAngleSize - angleOffset):
                 if leftRect:
                     pairs.append((leftRect, rect))
-
-        if pairs:
+                    leftRect = None
+                    
+        if len(pairs) >= 1:
             closestToMiddle = min(pairs, key = lambda x:abs(x[0][0][0] - screenSize[0]/2))
+        else:
+            return None, None, img
 
-            if display == True: #Create the annotated display if display is True
-                for pair in pairs:
-                    if pair == closestToMiddle:
-                        for tape in pair:
-                            img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 255, 0))
-                        circleContours = list(np.int0(cv2.boxPoints(pair[0])))
-                        circleContours.extend(list(np.int0(cv2.boxPoints(pair[1]))))
-                        circleContours = np.array(circleContours)
-                        (x,y),radius = cv2.minEnclosingCircle(circleContours)
-                        radius = int(radius)
-                        center = (int(x), int(y))
-                        img = cv2.circle(img, center, radius, (0, 255, 0))
-                    else:
-                        for tape in pair:
-                            img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 0, 255))
+        circleContours = list(np.int0(cv2.boxPoints(closestToMiddle[0])))
+        circleContours.extend(list(np.int0(cv2.boxPoints(closestToMiddle[1]))))
+        circleContours = np.array(circleContours)
+        (x,y),radius = cv2.minEnclosingCircle(circleContours)
+        radius = int(radius)
+        center = (int(x), int(y))
 
-            return -((x / (screenSize[0]/2))-1), img
-    return None, img
+        angle = (closestToMiddle[0][1][0] * closestToMiddle[0][1][1]) / (closestToMiddle[1][1][0] * closestToMiddle[1][1][1])
+        
+        if display == True: #Create the annotated display if display is True
+            for pair in pairs:
+                if pair == closestToMiddle:
+                    for tape in pair:
+                        img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 255, 0), thickness=2)
+                    img = cv2.circle(img, center, radius, (0, 255, 0))
+                else:
+                    for tape in pair:
+                        img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 0, 255))
 
+            return angle, -(((x/screenSize[0])*2)-1), img
+    return None, None, img
+
+def getGroundPos(img, sample=False): #TODO: Ground Tape Function
+    return None, None, None #Distance from x, distance from y, angle of line
+    
+#if False:
 if __name__ == "__main__":
+    from cscore import CameraServer, VideoSource
+    from networktables import NetworkTables
+    
     if len(sys.argv) >= 2:
         configFile = sys.argv[1]
 
@@ -178,6 +190,7 @@ if __name__ == "__main__":
     
     nt = NetworkTables.getTable('/vision')
     entry = nt.getEntry('target_tape_error')
+    entry_angle = nt.getEntry('angle')
 
     # start cameras
     cameras = []
@@ -190,11 +203,13 @@ if __name__ == "__main__":
     frame = np.zeros(shape=(screenSize[1], screenSize[0], 3))
     while True:
         time1, frame = sink.grabFrameNoTimeout(image=frame)
-        percent, image = getRetroPos(frame, True)
+        angle, percent, image = getRetroPos(frame, True)
 
         if not percent:
             percent = 999
-
+        if not angle:
+            angle = 999
         source.putFrame(image)
         entry.setNumber(percent)
+        entry_angle.setNumber(angle)
         NetworkTables.flush()
