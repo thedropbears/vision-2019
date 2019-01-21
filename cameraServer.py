@@ -11,8 +11,8 @@ from networktables import NetworkTables
     
 
 #Magic Numbers
-lowerGreen = (38, 125, 100) #Our Robot's Camera
-higherGreen = (52, 255, 180)
+lowerGreen = (38, 110, 50) #Our Robot's Camera
+higherGreen = (110, 255, 200)
 sampleLowerGreen = (30, 177, 80) #FRC sample images
 sampleHigherGreen = (150, 255, 255)
 lowerTapeColour = (0, 0, 0) #TODO: Ground Tape filter colours
@@ -176,7 +176,7 @@ def getRetroPos(img, display=False, sample=False):
             return angle, -(((x/screenSize[0])*2)-1), img
     return float("inf"), float("inf"), img
 
-def getGroundPos(img, sample=False): #TODO: Ground Tape Function
+def getGroundPos(img, sample=False):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     mask = cv2.inRange(gray, (50), (255))
 
@@ -239,7 +239,6 @@ def getGroundPos(img, sample=False): #TODO: Ground Tape Function
     return float("inf"), float("inf"), float("inf")
  
 
-
 if __name__ == "__main__":
     if len(sys.argv) >= 2:
         configFile = sys.argv[1]
@@ -264,8 +263,8 @@ if __name__ == "__main__":
     for cameraConfig in cameraConfigs:
         cameras.append(startCamera(cameraConfig))
 
-    ground_sink = cameras[0][0].getVideo(camera=cameras[0][1])
-    retro_sink = cameras[1][0].getVideo(camera=cameras[1][1])
+    ground_sink = cameras[1][0].getVideo(camera=cameras[1][1])
+    retro_sink = cameras[0][0].getVideo(camera=cameras[0][1])
     source = cameras[0][0].putVideo('cv', 320, 240)
 
     ground_frame = np.zeros(shape=(screenSize[1], screenSize[0], 3))
