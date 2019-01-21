@@ -36,7 +36,7 @@ def readCameraConfig(config):
 def readConfig():
     """Read configuration file."""
     # parse file
-    with open(configFile, "rt") as f:
+    with open(configFile) as f:
         j = json.load(f)
 
     # cameras
