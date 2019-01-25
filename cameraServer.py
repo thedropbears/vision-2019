@@ -1,23 +1,21 @@
 #!/usr/bin/env python3
 import json
-import time
 import sys
 import numpy as np
 import cv2
 import math
 from collections import namedtuple
-
 from cscore import CameraServer
 from networktables import NetworkTables
     
 
 #Magic Numbers
-lowerGreen = (38, 110, 50)  #Our Robot's Camera
-higherGreen = (110, 255, 200)
+lowerGreen = (38, 80, 50)  #Our Robot's Camera
+higherGreen = (160, 255, 200)
 sampleLowerGreen = (30, 177, 80)  #FRC sample images
 sampleHigherGreen = (150, 255, 255)
 minContourArea = 10
-angleOffset = 13
+angleOffset = 14
 rightAngleSize = -14.5
 leftAngleSize = -75.5
 screenSize = (320, 240)
@@ -56,13 +54,17 @@ def startCamera(config):
 
 
 #Process Functions
-def getRetroPos(img, display=False, sample=False):
-    """Function for finding retro-reflective tape a"""
+def getRetroPos(img, display=False):
+    """Function for finding retro-reflective tape"""
+    '''
+    newimg = img[:,:,1].astype(np.int32) - img[:,:,2] - img[:,:,0]
+    mask = newimg > 0
+    mask = mask.astype(np.uint8)
+    '''
+
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV) #Convert to HSV to make the mask easier
-    if sample:
-        mask = cv2.inRange(hsv, sampleLowerGreen, sampleHigherGreen) #Create a mask of everything in between the greens
-    else:
-        mask = cv2.inRange(hsv, lowerGreen, higherGreen)
+    mask = cv2.inRange(hsv, lowerGreen, higherGreen) #Create a mask of everything in between the greens
+
     mask = cv2.dilate(mask, None, iterations=2) #Expand the mask to allow for further away tape
 
     contours = cv2.findContours(mask, 1, 2)[-2] #Find the contours
@@ -72,14 +74,13 @@ def getRetroPos(img, display=False, sample=False):
         for cnt in contours:
             if cv2.contourArea(cnt) > minContourArea:
                 rects.append(cv2.minAreaRect(cnt))
-        rects.sort(key=lambda x:x[2])
-        
+    
         pairs = []
         leftRect = None
-        for i, rect in enumerate(sorted(rects, key=lambda x:x[0])): #Get rectangle pairs
-            if rect[2] < (leftAngleSize + angleOffset) and rect[2] > (leftAngleSize - angleOffset):
+        for rect in sorted(rects, key=lambda x:x[0]): #Get rectangle pairs
+            if (leftAngleSize - angleOffset) < rect[2] < (leftAngleSize + angleOffset):
                 leftRect = rect
-            elif rect[2] < (rightAngleSize + angleOffset) and rect[2] > (rightAngleSize - angleOffset):
+            elif (rightAngleSize - angleOffset) < rect[2] < (rightAngleSize + angleOffset):
                 if leftRect:
                     pairs.append((leftRect, rect))
                     leftRect = None
@@ -93,12 +94,10 @@ def getRetroPos(img, display=False, sample=False):
         circleContours.extend(list(np.int0(cv2.boxPoints(closestToMiddle[1]))))
         circleContours = np.array(circleContours)
         (x,y),radius = cv2.minEnclosingCircle(circleContours)
-        radius = int(radius)
-        center = (int(x), int(y))
-
-        angle = (closestToMiddle[0][1][0] * closestToMiddle[0][1][1]) / (closestToMiddle[1][1][0] * closestToMiddle[1][1][1])
         
         if display: #Create the annotated display if display is True
+            radius = int(radius)
+            center = (int(x), int(y))
             for pair in pairs:
                 if pair == closestToMiddle:
                     for tape in pair:
@@ -108,7 +107,7 @@ def getRetroPos(img, display=False, sample=False):
                     for tape in pair:
                         img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 0, 255))
 
-            return angle, -(((x/screenSize[0])*2)-1), img
+            return radius/170, -(((x/screenSize[0])*2)-1), img
     return float("NaN"), float("NaN"), img
 
 
@@ -206,7 +205,7 @@ if __name__ == "__main__":
     while True:
         _, ground_frame = ground_sink.grabFrameNoTimeout(image=ground_frame)
         _, retro_frame = retro_sink.grabFrameNoTimeout(image=retro_frame)
-        retro_angle, percent, image = getRetroPos(retro_frame, True)
+        width, percent, image = getRetroPos(retro_frame, True)
         ground_angle, x, y = getGroundPos(ground_frame)
 
         source.putFrame(image)
