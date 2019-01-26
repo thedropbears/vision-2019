@@ -4,8 +4,8 @@
 
 1. Image Raspberry pi with WPIlib Pi Image
 2. Plug in cameras in the order as specified below
-3. On the Vision Settings page, click add connected camera and choose the by path option in order. If the cameras are plugged in, there should be two logitech cameras first, then two PSeye cameras.
-4. Upload camera configs (Or manually configure (info below) and click the copy button, and then save)
+3. On the Vision Settings page, click add connected camera and choose the by path option in order. If the cameras are plugged in, the order should be Top Cargo (logi), Ground Cargo (ps), Top Hatch (logi), then Ground Hatch (ps).
+4. Upload camera configs (Or manually configure (info below) and click the copy button, and then save) (Note that all cameras must have unique names)
 5. In 'Application Settings', select 'Uploaded Python File' and upload cameraServer.py to the box
 6. Change the Pi to Writable and click save
 
