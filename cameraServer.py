@@ -91,7 +91,7 @@ def getRetroPos(img, display=False):
         if len(pairs) >= 1:
             closestToMiddle = min(pairs, key = lambda x:abs(x[0][0][0] - screenSize[0]/2))
         else:
-            return float("NaN"), float("NaN"), mask
+            return float("NaN"), float("NaN"), img
 
         circleContours = list(np.int0(cv2.boxPoints(closestToMiddle[0])))
         circleContours.extend(list(np.int0(cv2.boxPoints(closestToMiddle[1]))))
@@ -110,8 +110,8 @@ def getRetroPos(img, display=False):
                     for tape in pair:
                         img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 0, 255))
 
-            return radius, -(((x/screenSize[0])*2)-1), mask
-    return float("NaN"), float("NaN"), mask
+            return radius, -(((x/screenSize[0])*2)-1), img
+    return float("NaN"), float("NaN"), img
 
 
 def getGroundPos(img, sample=False):
