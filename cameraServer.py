@@ -38,6 +38,8 @@ def readConfig():
     try:
         with open(configFile) as f:
             j = json.load(f)
+    except:
+        exit()
 
     # cameras
     cameras = j["cameras"]
