@@ -10,8 +10,8 @@ from networktables import NetworkTables
     
 
 #Magic Numbers
-lowerGreen = (38, 80, 50)  #Our Robot's Camera
-higherGreen = (160, 255, 200)
+lowerGreen = (38, 80, 90)  #Our Robot's Camera
+higherGreen = (170, 255, 200)
 sampleLowerGreen = (30, 177, 80)  #FRC sample images
 sampleHigherGreen = (150, 255, 255)
 minContourArea = 10
@@ -34,8 +34,10 @@ def readCameraConfig(config):
 def readConfig():
     """Read configuration file."""
     # parse file
-    with open(configFile) as f:
-        j = json.load(f)
+
+    try:
+        with open(configFile) as f:
+            j = json.load(f)
 
     # cameras
     cameras = j["cameras"]
@@ -64,8 +66,7 @@ def getRetroPos(img, display=False):
 
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV) #Convert to HSV to make the mask easier
     mask = cv2.inRange(hsv, lowerGreen, higherGreen) #Create a mask of everything in between the greens
-
-    mask = cv2.dilate(mask, None, iterations=2) #Expand the mask to allow for further away tape
+    mask = cv2.dilate(mask, None, iterations=1) #Expand the mask to allow for further away tape
 
     contours = cv2.findContours(mask, 1, 2)[-2] #Find the contours
     
@@ -88,7 +89,7 @@ def getRetroPos(img, display=False):
         if len(pairs) >= 1:
             closestToMiddle = min(pairs, key = lambda x:abs(x[0][0][0] - screenSize[0]/2))
         else:
-            return float("NaN"), float("NaN"), img
+            return float("NaN"), float("NaN"), mask
 
         circleContours = list(np.int0(cv2.boxPoints(closestToMiddle[0])))
         circleContours.extend(list(np.int0(cv2.boxPoints(closestToMiddle[1]))))
@@ -107,8 +108,8 @@ def getRetroPos(img, display=False):
                     for tape in pair:
                         img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 0, 255))
 
-            return radius/170, -(((x/screenSize[0])*2)-1), img
-    return float("NaN"), float("NaN"), img
+            return radius, -(((x/screenSize[0])*2)-1), mask
+    return float("NaN"), float("NaN"), mask
 
 
 def getGroundPos(img, sample=False):
@@ -124,7 +125,6 @@ def getGroundPos(img, sample=False):
             rect = cv2.minAreaRect(cnt)
             boxpoints = np.int0(cv2.boxPoints(rect))
             img = cv2.drawContours(img, [boxpoints], 0, (255))
-
             inner_points = []
             for point in boxpoints:
                 outside = False
@@ -190,21 +190,32 @@ if __name__ == "__main__":
     entry_angle = nt.getEntry('ground_tape_angle')
     entry_y = nt.getEntry('ground_tape_y')
     entry_tape_angle = nt.getEntry('target_tape_error')
+    entry_game_piece = nt.getEntry('game_piece')
 
     # start cameras
     cameras = []
     for cameraConfig in cameraConfigs:
         cameras.append(startCamera(cameraConfig))
 
-    ground_sink = cameras[1][0].getVideo(camera=cameras[1][1])
-    retro_sink = cameras[0][0].getVideo(camera=cameras[0][1])
+    cargo_retro_sink = cameras[0][0].getVideo(camera=cameras[0][1])
+    hatch_retro_sink = cameras[1][0].getVideo(camera=cameras[1][1])
+    cargo_ground_sink = cameras[2][0].getVideo(camera=cameras[2][1])
+    hatch_ground_sink = cameras[3][0].getVideo(camera=cameras[3][1])
+
     source = cameras[0][0].putVideo('cv', 320, 240)
 
     ground_frame = np.zeros(shape=(screenSize[1], screenSize[0], 3))
     retro_frame = np.zeros(shape=(screenSize[1], screenSize[0], 3))
+    game_piece = 0 #0 = hatch, 1 = cargo
+
     while True:
-        _, ground_frame = ground_sink.grabFrameNoTimeout(image=ground_frame)
-        _, retro_frame = retro_sink.grabFrameNoTimeout(image=retro_frame)
+        game_piece = entry_game_piece.getBoolean(0)
+        if game_piece:
+            _, ground_frame = hatch_ground_sink.grabFrameNoTimeout(image=ground_frame)
+            _, retro_frame = hatch_retro_sink.grabFrameNoTimeout(image=retro_frame)
+        elif not game_piece:
+            _, ground_frame = cargo_ground_sink.grabFrameNoTimeout(image=ground_frame)
+            _, retro_frame = cargo_retro_sink.grabFrameNoTimeout(image=retro_frame)
         width, percent, image = getRetroPos(retro_frame, True)
         ground_angle, x, y = getGroundPos(ground_frame)
 
