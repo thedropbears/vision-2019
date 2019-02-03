@@ -12,10 +12,8 @@ from networktables import NetworkTables
     
 
 #Magic Numbers
-lowerGreen = (38, 100, 80)  #Our Robot's Camera
-higherGreen = (160, 255, 230)
-sampleLowerGreen = (30, 177, 80)  #FRC sample images
-sampleHigherGreen = (150, 255, 255)
+lowerGreen = (50, 120, 130)  #Our Robot's Camera
+higherGreen = (100, 220, 220)
 minContourArea = 10
 angleOffset = 14
 rightAngleSize = -14.5
@@ -43,11 +41,8 @@ def readConfig():
     """Read configuration file."""
     # parse file
 
-    try:
-        with open(configFile) as f:
-            j = json.load(f)
-    except:
-        exit()
+    with open(configFile) as f:
+        j = json.load(f)
 
     # cameras
     cameras = j["cameras"]
@@ -66,7 +61,7 @@ def startCamera(config):
 
 
 #Process Functions
-def getRetroPos(img, display=False, distance_away=110):
+def getRetroPos(img, display=False, distance_away=distance_away):
     """Function for finding retro-reflective tape"""
     '''
     newimg = img[:,:,1].astype(np.int32) - img[:,:,2] - img[:,:,0]
@@ -74,6 +69,7 @@ def getRetroPos(img, display=False, distance_away=110):
     mask = mask.astype(np.uint8)
     '''
 
+    img = cv2.line(img, (160, 0), (160, 240), (255, 0, 0), thickness=1)
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV) #Convert to HSV to make the mask easier
     mask = cv2.inRange(hsv, lowerGreen, higherGreen) #Create a mask of everything in between the greens
     mask = cv2.dilate(mask, None, iterations=1) #Expand the mask to allow for further away tape
@@ -97,9 +93,9 @@ def getRetroPos(img, display=False, distance_away=110):
                     leftRect = None
                     
         if len(pairs) >= 1:
-            closestToMiddle = min(pairs, key = lambda x:abs(x[0][0][0] - screenSize[0]/2))
+            closestToMiddle = min(pairs, key = lambda x:abs((x[0][0][0]+x[1][0][0]) - screenSize[0]))
         else:
-            return False, math.nan, img
+            return False, math.nan, img, mask
 
         circleContours = list(np.int0(cv2.boxPoints(closestToMiddle[0])))
         circleContours.extend(list(np.int0(cv2.boxPoints(closestToMiddle[1]))))
@@ -114,16 +110,16 @@ def getRetroPos(img, display=False, distance_away=110):
                     for tape in pair:
                         img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 255, 0), thickness=2)
                     img = cv2.circle(img, center, radius, (0, 255, 0))
+                    img = cv2.circle(img, center, 3, (0, 255, 0))
                 else:
                     for tape in pair:
                         img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 0, 255), thickness=2)
 
-            return radius>distance_away, -(((x/screenSize[0])*2)-1), img
-    return False, math.nan, img
+            return radius>distance_away, -(((x/screenSize[0])*2)-1), img, mask
+    return False, math.nan, img, mask
 
 
 if __name__ == "__main__":
-
     if len(sys.argv) >= 2:
         configFile = sys.argv[1]
 
@@ -149,20 +145,21 @@ if __name__ == "__main__":
     hatch_sink = cameras[1][0].getVideo(camera=cameras[1][1])
 
     source = cameras[0][0].putVideo('Driver_Stream', 320, 240)
+    source2 = cameras[1][0].putVideo('mask', 320, 240)
 
-    ground_frame = np.zeros(shape=(screenSize[1], screenSize[0], 3))
-    retro_frame = np.zeros(shape=(screenSize[1], screenSize[0], 3))
+    frame = np.zeros(shape=(screenSize[1], screenSize[0], 3))
     game_piece = 0 #0 = hatch, 1 = cargo
 
     while True:
         game_piece = entry_game_piece.getBoolean(0)
         if not game_piece:
-            _, retro_frame = hatch_sink.grabFrameNoTimeout(image=retro_frame)
+            _, frame = hatch_sink.grabFrameNoTimeout(image=frame)
         else:
-            _, retro_frame = cargo_sink.grabFrameNoTimeout(image=retro_frame)
-        outake, percent, image = getRetroPos(retro_frame, True, distance_away=distance_away_nt)
+            _, frame = cargo_sink.grabFrameNoTimeout(image=frame)
+        outake, percent, image, mask = getRetroPos(frame, True, distance_away=distance_away)
 
         source.putFrame(image)
+        source2.putFrame(mask)
         entry_tape_angle.setNumber(percent)
         entry_outake.setBoolean(outake)
         NetworkTables.flush()
