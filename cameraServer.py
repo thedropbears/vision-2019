@@ -148,17 +148,19 @@ if __name__ == "__main__":
     while True:
         game_piece = entry_game_piece.getBoolean(0)
         if not game_piece:
-            _, frame = hatch_sink.grabFrameNoTimeout(image=frame)
-            if frame == 0:
+            frame_time, frame = hatch_sink.grabFrameNoTimeout(image=frame)
+            if frame_time == 0:
                 print(hatch_sink.getError(), file=sys.stderr)
+                source.notifyError(hatch_sink.getError())
                 outtake = False
                 percent = math.nan
             else:
                 outake, percent, image, mask = getRetroPos(frame, True, distance_away=distance_away)
         else:
-            _, frame = cargo_sink.grabFrameNoTimeout(image=frame)
-            if frame == 0:
+            frame_time, frame = cargo_sink.grabFrameNoTimeout(image=frame)
+            if frame_time == 0:
                 print(cargo_sink.getError(), file=sys.stderr)
+                source.notifyError(cargo_sink.getError())
                 outtake = False
                 percent = math.nan
             else:
