@@ -16,15 +16,10 @@ lowerGreen = (50, 120, 130)  #Our Robot's Camera
 higherGreen = (100, 220, 220)
 minContourArea = 10
 angleOffset = 14
-rightAngleSize = -14.5
+rightAngleSize = -14
 leftAngleSize = -75.5
 screenSize = (320, 240)
-screenWidth = 320
-screenHeight = 240
-distance_away = 500
-
-halfScreenWidth = screenWidth / 2
-halfScreenHeight = screenHeight / 2
+distance_away = 110
 
 #Initialisation
 configFile = "/boot/frc.json"
@@ -154,9 +149,20 @@ if __name__ == "__main__":
         game_piece = entry_game_piece.getBoolean(0)
         if not game_piece:
             _, frame = hatch_sink.grabFrameNoTimeout(image=frame)
+            if frame == 0:
+                print(hatch_sink.getError(), file=sys.stderr)
+                outtake = False
+                percent = math.nan
+            else:
+                outake, percent, image, mask = getRetroPos(frame, True, distance_away=distance_away)
         else:
             _, frame = cargo_sink.grabFrameNoTimeout(image=frame)
-        outake, percent, image, mask = getRetroPos(frame, True, distance_away=distance_away)
+            if frame == 0:
+                print(cargo_sink.getError(), file=sys.stderr)
+                outtake = False
+                percent = math.nan
+            else:
+                outake, percent, image, mask = getRetroPos(frame, True, distance_away=distance_away)
 
         source.putFrame(image)
         source2.putFrame(mask)
