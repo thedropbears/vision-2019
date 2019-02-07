@@ -60,11 +60,11 @@ def getRetroPos(img, display=False, distance_away=distance_away):
     """Function for finding retro-reflective tape"""
     '''
     newimg = img[:,:,1].astype(np.int32) - img[:,:,2] - img[:,:,0]
-    mask = newimg > 0
-    mask = mask.astype(np.uint8)
+    newimg -= newimg.min()
+    newimg = newimg.astype(np.float64)*255/newimg.max()
+    newimg = np.int0(newimg).astype(np.uint8)
     '''
 
-    img = cv2.line(img, (160, 0), (160, 240), (255, 0, 0), thickness=1)
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV) #Convert to HSV to make the mask easier
     mask = cv2.inRange(hsv, lowerGreen, higherGreen) #Create a mask of everything in between the greens
     mask = cv2.dilate(mask, None, iterations=1) #Expand the mask to allow for further away tape
@@ -78,7 +78,6 @@ def getRetroPos(img, display=False, distance_away=distance_away):
                 rects.append(cv2.minAreaRect(cnt))
     
         pairs = []
-        leftRect = None
         for rect in sorted(rects, key=lambda x:x[0]): #Get rectangle pairs
             if (leftAngleSize - angleOffset) < rect[2] < (leftAngleSize + angleOffset):
                 leftRect = rect
@@ -92,25 +91,24 @@ def getRetroPos(img, display=False, distance_away=distance_away):
         else:
             return False, math.nan, img, mask
 
-        circleContours = list(np.int0(cv2.boxPoints(closestToMiddle[0])))
-        circleContours.extend(list(np.int0(cv2.boxPoints(closestToMiddle[1]))))
-        circleContours = np.array(circleContours)
-        (x,y),radius = cv2.minEnclosingCircle(circleContours)
-        
+        boxed_points = [np.int0(cv2.boxPoints(closestToMiddle[0])), np.int0(cv2.boxPoints(closestToMiddle[1]))]
+        mid_points = (max(boxed_points[0], key=lambda x:x[0]), min(boxed_points[1], key=lambda x:x[0]))
+        center_point = int(np.mean([mid_points[0][0], mid_points[1][0]]))
+        (x,y),radius = cv2.minEnclosingCircle(np.array(boxed_points).reshape(-1, 2))
+
         if display: #Create the annotated display if display is True
-            radius = int(radius)
+            img = cv2.line(img, (160, 0), (160, 240), (255, 0, 0), thickness=1)
             center = (int(x), int(y))
             for pair in pairs:
                 if pair == closestToMiddle:
-                    for tape in pair:
-                        img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 255, 0), thickness=2)
-                    img = cv2.circle(img, center, radius, (0, 255, 0))
-                    img = cv2.circle(img, center, 3, (0, 255, 0))
+                    img = cv2.drawContours(img, [boxed_points[0]], 0, (0, 255, 0), thickness=2)
+                    img = cv2.drawContours(img, [boxed_points[1]], 0, (0, 255, 0), thickness=2)
+                    img = cv2.circle(img, center, int(radius), (0, 255, 0))
                 else:
-                    for tape in pair:
-                        img = cv2.drawContours(img, [np.int0(cv2.boxPoints(tape))], 0, (0, 0, 255), thickness=2)
+                    img = cv2.drawContours(img, [np.int0(cv2.boxPoints(pair[0]))], 0, (0, 0, 255), thickness=2)
+                    img = cv2.drawContours(img, [np.int0(cv2.boxPoints(pair[1]))], 0, (0, 0, 255), thickness=2)
 
-            return radius>distance_away, -(((x/screenSize[0])*2)-1), img, mask
+        return radius>distance_away, -(((center_point/screenSize[0])*2)-1), img, mask
     return False, math.nan, img, mask
 
 
@@ -124,7 +122,7 @@ if __name__ == "__main__":
     # start NetworkTables
     NetworkTables.initialize(server='10.47.74.2')
 
-    
+    NetworkTables.setUpdateRate(1)
     nt = NetworkTables.getTable('/vision')
     entry_tape_angle = nt.getEntry('target_tape_error')
     entry_game_piece = nt.getEntry('game_piece')
