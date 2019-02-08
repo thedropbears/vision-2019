@@ -58,18 +58,13 @@ def startCamera(config):
 #Process Functions
 def getRetroPos(img, display=False, distance_away=distance_away):
     """Function for finding retro-reflective tape"""
-    '''
-    newimg = img[:,:,1].astype(np.int32) - img[:,:,2] - img[:,:,0]
-    newimg -= newimg.min()
-    newimg = newimg.astype(np.float64)*255/newimg.max()
-    newimg = np.int0(newimg).astype(np.uint8)
-    '''
 
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV) #Convert to HSV to make the mask easier
     mask = cv2.inRange(hsv, lowerGreen, higherGreen) #Create a mask of everything in between the greens
     mask = cv2.dilate(mask, None, iterations=1) #Expand the mask to allow for further away tape
 
-    contours = cv2.findContours(mask, 1, 2)[-2] #Find the contours
+    contours = cv2.findContours(mask, 1, 2)[1] #Find the contours
+    print(contours)
     
     if len(contours) > 1: #Get contours with area above magic number 10 and append its smallest rectangle
         rects = []
@@ -78,6 +73,7 @@ def getRetroPos(img, display=False, distance_away=distance_away):
                 rects.append(cv2.minAreaRect(cnt))
     
         pairs = []
+        leftRect = None
         for rect in sorted(rects, key=lambda x:x[0]): #Get rectangle pairs
             if (leftAngleSize - angleOffset) < rect[2] < (leftAngleSize + angleOffset):
                 leftRect = rect
