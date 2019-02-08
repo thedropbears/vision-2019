@@ -64,7 +64,6 @@ def getRetroPos(img, display=False, distance_away=distance_away):
     mask = cv2.dilate(mask, None, iterations=1) #Expand the mask to allow for further away tape
 
     contours = cv2.findContours(mask, 1, 2)[1] #Find the contours
-    print(contours)
     
     if len(contours) > 1: #Get contours with area above magic number 10 and append its smallest rectangle
         rects = []
