@@ -84,23 +84,18 @@ def getOffset(width, x):
 def getRetroPos(frame: np.array, annotated: bool = False):
     """Function for finding retro-reflective tape"""
 
-    hsv = cv2.cvtColor(
-        frame, cv2.COLOR_BGR2HSV
-    )  # Convert to HSV to make the mask easier
-    mask = cv2.inRange(
-        hsv, lowerGreen, higherGreen
-    )  # Create a mask of everything in between the greens
-    mask = cv2.dilate(
-        mask, None, iterations=1
-    )  # Expand the mask to allow for further away tape
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)  
+    # Convert to HSV to make the mask easier
+    mask = cv2.inRange(hsv, lowerGreen, higherGreen)  
+    # Create a mask of everything in between the greens
+    mask = cv2.dilate(mask, None, iterations=1)  
+    # Expand the mask to allow for further away tape
 
-    _, contours, _ = cv2.findContours(
-        mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE
-    )  # Find the contours
+    _, contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)  
+    # Find the contours
 
-    if (
-        len(contours) <= 1
-    ):  # Get contours with area above magic number 10 and append its smallest rectangle
+    if (len(contours) <= 1):  
+    # Get contours with area above magic number 10 and append its smallest rectangle
         return False, math.nan, frame, math.nan, math.nan
 
     rects = []
