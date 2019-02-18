@@ -83,31 +83,31 @@ def getOffset(width, x):
 
 def createAnnotatedDisplay(
     frame: np.array, pairs: list, closestToMiddle: tuple, circle: tuple
-):
-    img = cv2.line(frame, (160, 0), (160, 240), (255, 0, 0), thickness=1)
+) -> np.array:
+    frame = cv2.line(frame, (160, 0), (160, 240), (255, 0, 0), thickness=1)
     for pair in pairs:
         if (pair[0][1][0] == closestToMiddle[0][0]).all():
-            colour = (0, 255, 0)
-            img = cv2.circle(
-                img, (int(circle[0][0]), int(circle[0][1])), int(circle[1]), colour
+            colour = (0, 255, 0) #Green
+            frame = cv2.circle(
+                frame, (int(circle[0][0]), int(circle[0][1])), int(circle[1]), colour
             )
         else:
-            colour = (0, 0, 255)
+            colour = (0, 0, 255) #Red
         for tape in pair:
-            img = cv2.drawContours(
-                img, [np.int0(tape[1])], 0, colour, thickness=2
+            frame = cv2.drawContours(
+                frame, [np.int0(tape[1])], 0, colour, thickness=2
             )
-    return img
+    return frame
 
 
-def getRetroPos(frame: np.array, annotated: bool = False):
+def getRetroPos(frame: np.array, hsv: np.array, mask: np.array, img: np.array, annotated = False) -> (np.array, float, float):
     """Function for finding retro-reflective tape"""
 
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV, dst=hsv)
     # Convert to HSV to make the mask easier
-    mask = cv2.inRange(hsv, lowerGreen, higherGreen)
+    mask = cv2.inRange(hsv, lowerGreen, higherGreen, dst=mask)
     # Create a mask of everything in between the greens
-    mask = cv2.dilate(mask, None, iterations=1)
+    # mask = cv2.dilate(mask, None, iterations=1)
     # Expand the mask to allow for further away tape
 
     _, contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
@@ -124,9 +124,9 @@ def getRetroPos(frame: np.array, annotated: bool = False):
     boxed_and_angles = []
     for rect in rects:
         if math.isclose(rect[2], leftAngleSize, abs_tol=angleOffset):
-            boxed_and_angles.append([False, np.array(cv2.boxPoints(rect))])
+            boxed_and_angles.append([False, np.array(cv2.boxPoints(rect)), cv2.contourArea(cv2.boxPoints(rect))])
         elif math.isclose(rect[2], rightAngleSize, abs_tol=angleOffset):
-            boxed_and_angles.append([True, np.array(cv2.boxPoints(rect))])
+            boxed_and_angles.append([True, np.array(cv2.boxPoints(rect)), cv2.contourArea(cv2.boxPoints(rect))])
 
     pairs = []
     leftRect = None
@@ -135,7 +135,7 @@ def getRetroPos(frame: np.array, annotated: bool = False):
     ):  # Get rectangle pairs
         if not rect[0]:
             leftRect = rect
-        elif leftRect:
+        elif leftRect and math.isclose(leftRect[2], rect[2], abs_tol=0.3*leftRect[2]):
             pairs.append((leftRect, rect))
             leftRect = None
 
@@ -186,19 +186,16 @@ if __name__ == "__main__":
     for cameraConfig in cameraConfigs:
         cameras.append(startCamera(cameraConfig))
 
-    cargo_sink = cameras[0][0].getVideo(camera=cameras[0][1])
+    cargo_rocket_sink = cameras[0][0].getVideo(camera=cameras[0][1])
     hatch_sink = cameras[1][0].getVideo(camera=cameras[1][1])
-
     source = cameras[0][0].putVideo("Driver_Stream", screenX, screenY)
-    # source2    = cameras[1][0].putVideo('mask', 320, 240)
 
     frame = np.zeros(shape=(screenSize[1], screenSize[0], 3), dtype=np.uint8)
     image = np.zeros(shape=(screenSize[1], screenSize[0], 3), dtype=np.uint8)
     hsv = np.zeros(shape=(screenSize[1], screenSize[0], 3), dtype=np.uint8)
-    mask = np.zeros(shape=(screenSize[1], screenSize[0], 3), dtype=np.uint8)
+    mask = np.zeros(shape=(screenSize[1], screenSize[0]), dtype=np.uint8)
     img = np.zeros(shape=(screenSize[1], screenSize[0], 3), dtype=np.uint8)
 
-    game_piece = 0  # 0 = hatch, 1 = cargo
     old_ping_time = 0
     while True:
         ping_time = ping.getNumber(0)
@@ -208,26 +205,17 @@ if __name__ == "__main__":
             old_ping_time = ping_time
         game_piece = entry_game_piece.getBoolean(0)
         fiducial_time = time.monotonic()
-        if not game_piece:
-            frame_time, frame = hatch_sink.grabFrameNoTimeout(image=frame)
-            if frame_time == 0:
-                print(hatch_sink.getError(), file=sys.stderr)
-                source.notifyError(hatch_sink.getError())
-                outtake = False
-                percent = math.nan
-            else:
-                image, dist, offset = getRetroPos(frame, True)
+        sink = hatch_sink if game_piece == 0 else cargo_rocket_sink
+
+        frame_time, frame = sink.grabFrameNoTimeout(image=frame)
+        if frame_time == 0:
+            print(sink.getError(), file=sys.stderr)
+            source.notifyError(sink.getError())
+            outtake = False
+            percent = math.nan
         else:
-            frame_time, frame = cargo_sink.grabFrameNoTimeout(image=frame)
-            if frame_time == 0:
-                print(cargo_sink.getError(), file=sys.stderr)
-                source.notifyError(cargo_sink.getError())
-                outtake = False
-                percent = math.nan
-            else:
-                image, dist, offset = getRetroPos(frame, True)
+            image, dist, offset = getRetroPos(frame, hsv, mask, img, True)
         source.putFrame(image)
-        # source2.putFrame(mask)
         if not math.isnan(dist):
             entry_dist.setNumber(dist)
             entry_offset.setNumber(offset)
