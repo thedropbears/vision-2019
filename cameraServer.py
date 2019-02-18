@@ -100,15 +100,13 @@ def createAnnotatedDisplay(
     return frame
 
 
-def getRetroPos(frame: np.array, hsv: np.array, mask: np.array, img: np.array, annotated = False) -> (np.array, float, float):
+def getRetroPos(frame: np.array, annotated: bool, hsv: np.array, mask: np.array) -> (np.array, float, float):
     """Function for finding retro-reflective tape"""
 
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV, dst=hsv)
     # Convert to HSV to make the mask easier
     mask = cv2.inRange(hsv, lowerGreen, higherGreen, dst=mask)
     # Create a mask of everything in between the greens
-    # mask = cv2.dilate(mask, None, iterations=1)
-    # Expand the mask to allow for further away tape
 
     _, contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     # Find the contours
@@ -150,11 +148,11 @@ def getRetroPos(frame: np.array, hsv: np.array, mask: np.array, img: np.array, a
     (x, y), radius = cv2.minEnclosingCircle(np.array(closestToMiddle).reshape(-1, 2))
 
     if annotated:
-        img = createAnnotatedDisplay(frame, pairs, closestToMiddle, ((x, y), radius))
+        frame = createAnnotatedDisplay(frame, pairs, closestToMiddle, ((x, y), radius))
 
     dist, offset = getDistance(closestToMiddle)
     return (
-        img,
+        frame,
         dist,
         offset,
     )
@@ -180,6 +178,7 @@ if __name__ == "__main__":
     entry_dist = nt.getEntry("fiducial_x")
     entry_offset = nt.getEntry("fiducial_y")
     entry_fiducial_time = nt.getEntry("fiducial_time")
+    entry_camera = nt.getEntry("using_cargo_camera")
 
     # start cameras
     cameras = []
@@ -206,7 +205,7 @@ if __name__ == "__main__":
         game_piece = entry_game_piece.getBoolean(0)
         fiducial_time = time.monotonic()
         sink = hatch_sink if game_piece == 0 else cargo_rocket_sink
-
+        entry_camera.setBoolean(False if not game_piece else True)
         frame_time, frame = sink.grabFrameNoTimeout(image=frame)
         if frame_time == 0:
             print(sink.getError(), file=sys.stderr)
@@ -214,9 +213,12 @@ if __name__ == "__main__":
             outtake = False
             percent = math.nan
         else:
-            image, dist, offset = getRetroPos(frame, hsv, mask, img, True)
+            image, dist, offset = getRetroPos(frame, True, hsv, mask)
         source.putFrame(image)
         if not math.isnan(dist):
+            if game_piece == 1:
+                dist *= -1
+                offset *= -1
             entry_dist.setNumber(dist)
             entry_offset.setNumber(offset)
             entry_fiducial_time.setNumber(fiducial_time)
