@@ -203,7 +203,7 @@ if __name__ == "__main__":
             raspi_pong.setNumber(time.monotonic())
             rio_pong.setNumber(ping_time)
             old_ping_time = ping_time
-        game_piece = entry_game_piece.getBoolean(0)
+        game_piece = entry_game_piece.getNumber(0)
         fiducial_time = time.monotonic()
         sink = hatch_sink if game_piece == 0 else cargo_rocket_sink
         entry_camera.setBoolean(False if not game_piece else True)
@@ -216,7 +216,7 @@ if __name__ == "__main__":
         else:
             image, dist, offset = getRetroPos(frame, True, hsv, mask)
         source.putFrame(image)
-        if not math.isnan(dist):
+        if not math.isnan(dist) and not dist < 0.6 and not dist > 3 and not abs(offset) > 2:
             if game_piece == 1:
                 dist *= -1
                 offset *= -1
