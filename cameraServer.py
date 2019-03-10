@@ -7,8 +7,7 @@ import math
 import time
 from collections import namedtuple
 from cscore import CameraServer
-from networktables import NetworkTables
-
+from networktables import NetworkTablesInstance, NetworkTables
 
 # Magic Numbers
 lowerGreen = (50, 120, 130)  # Our Robot's Camera
@@ -76,7 +75,6 @@ def getDistance(boxes):
 
 
 def getOffset(width, x):
-    # if width = 20cm then what is x in cm
     offset = x / (width / (realTapeDistance))
     return -offset
 
@@ -166,19 +164,23 @@ if __name__ == "__main__":
     cameraConfigs = readConfig()
 
     # start NetworkTables
+
+    ntinst = NetworkTablesInstance()
+    ntinst.startServer()
+    ntinst.setUpdateRate(1)
+
     NetworkTables.initialize(server="10.47.74.2")
-
     NetworkTables.setUpdateRate(1)
-    nt = NetworkTables.getTable("/vision")
-    ping = nt.getEntry("ping")
-    raspi_pong = nt.getEntry("raspi_pong")
-    rio_pong = nt.getEntry("rio_pong")
 
-    entry_game_piece = nt.getEntry("game_piece")
-    entry_dist = nt.getEntry("fiducial_x")
-    entry_offset = nt.getEntry("fiducial_y")
-    entry_fiducial_time = nt.getEntry("fiducial_time")
-    entry_camera = nt.getEntry("using_cargo_camera")
+    ping = ntinst.getEntry("/vision/ping")
+    raspi_pong = ntinst.getEntry("/vision/raspi_pong")
+    rio_pong = ntinst.getEntry("/vision/rio_pong")
+
+    entry_game_piece = ntinst.getEntry("/vision/game_piece")
+    entry_dist = ntinst.getEntry("/vision/fiducial_x")
+    entry_offset = ntinst.getEntry("/vision/fiducial_y")
+    entry_fiducial_time = ntinst.getEntry("/vision/fiducial_time")
+    entry_camera = ntinst.getEntry("/vision/using_cargo_camera")
 
     # start cameras
     cameras = []
@@ -194,7 +196,6 @@ if __name__ == "__main__":
     hsv = np.zeros(shape=(screenSize[1], screenSize[0], 3), dtype=np.uint8)
     mask = np.zeros(shape=(screenSize[1], screenSize[0]), dtype=np.uint8)
     img = np.zeros(shape=(screenSize[1], screenSize[0], 3), dtype=np.uint8)
-
     old_ping_time = 0
     while True:
         ping_time = ping.getNumber(0)
@@ -202,7 +203,7 @@ if __name__ == "__main__":
             raspi_pong.setNumber(time.monotonic())
             rio_pong.setNumber(ping_time)
             old_ping_time = ping_time
-        game_piece = entry_game_piece.getBoolean(0)
+        game_piece = entry_game_piece.getNumber(0)
         fiducial_time = time.monotonic()
         sink = hatch_sink if game_piece == 0 else cargo_rocket_sink
         entry_camera.setBoolean(False if not game_piece else True)
@@ -215,7 +216,7 @@ if __name__ == "__main__":
         else:
             image, dist, offset = getRetroPos(frame, True, hsv, mask)
         source.putFrame(image)
-        if not math.isnan(dist):
+        if not math.isnan(dist) and not dist < 0.6 and not dist > 3 and not abs(offset) > 2:
             if game_piece == 1:
                 dist *= -1
                 offset *= -1
