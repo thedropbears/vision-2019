@@ -2,8 +2,6 @@ from cameraServer import getRetroPos
 import cv2
 import numpy as np
 
-lowerGreen = (50, 120, 130)
-higherGreen = (100, 220, 220)
 screenSize = (320, 240)
 
 images = [
@@ -17,7 +15,7 @@ images = [
 
 hsv = np.zeros(shape=(screenSize[1], screenSize[0], 3), dtype=np.uint8)
 mask = np.zeros(shape=(screenSize[1], screenSize[0]), dtype=np.uint8)
-frame = np.zeros(shape=(screenSize[1], screenSize[0], 3), dtype=np.uint8)
+
 for image in images:
     values = getRetroPos(cv2.imread('.\\samples\\' + image[0]), True, hsv, mask)
     print(values[1], values[2])
