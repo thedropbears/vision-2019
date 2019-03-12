@@ -80,21 +80,11 @@ def getOffset(width, x):
 
 
 def createAnnotatedDisplay(
-    frame: np.array, pairs: list, closestToMiddle: tuple, circle: tuple
+    frame: np.array, circle: tuple
 ) -> np.array:
-    frame = cv2.line(frame, (160, 0), (160, 240), (255, 0, 0), thickness=1)
-    for pair in pairs:
-        if (pair[0][1][0] == closestToMiddle[0][0]).all():
-            colour = (0, 255, 0) #Green
-            frame = cv2.circle(
-                frame, (int(circle[0][0]), int(circle[0][1])), int(circle[1]), colour
-            )
-        else:
-            colour = (0, 0, 255) #Red
-        for tape in pair:
-            frame = cv2.drawContours(
-                frame, [np.int0(tape[1])], 0, colour, thickness=2
-            )
+    frame = cv2.circle(
+        frame, (int(circle[0][0]), int(circle[0][1])), int(circle[1] * 1.3), (0, 0, 255)
+    )
     return frame
 
 
@@ -146,7 +136,7 @@ def getRetroPos(frame: np.array, annotated: bool, hsv: np.array, mask: np.array)
     (x, y), radius = cv2.minEnclosingCircle(np.array(closestToMiddle).reshape(-1, 2))
 
     if annotated:
-        frame = createAnnotatedDisplay(frame, pairs, closestToMiddle, ((x, y), radius))
+        frame = createAnnotatedDisplay(frame, ((x, y), radius))
 
     dist, offset = getDistance(closestToMiddle)
     return (
@@ -206,7 +196,7 @@ if __name__ == "__main__":
         game_piece = entry_game_piece.getNumber(0)
         fiducial_time = time.monotonic()
         sink = hatch_sink if game_piece == 0 else cargo_rocket_sink
-        entry_camera.setBoolean(False if not game_piece else True)
+        entry_camera.setBoolean(bool(game_piece))
         frame_time, frame = sink.grabFrameNoTimeout(image=frame)
         if frame_time == 0:
             print(sink.getError(), file=sys.stderr)
@@ -223,4 +213,4 @@ if __name__ == "__main__":
             entry_dist.setNumber(dist)
             entry_offset.setNumber(offset)
             entry_fiducial_time.setNumber(fiducial_time)
-        NetworkTables.flush()
+        ntinst.flush()
