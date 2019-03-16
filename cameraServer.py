@@ -83,7 +83,11 @@ def createAnnotatedDisplay(
     frame: np.array, circle: tuple
 ) -> np.array:
     frame = cv2.circle(
-        frame, (int(circle[0][0]), int(circle[0][1])), int(circle[1] * 1.3), (0, 0, 255)
+        frame,
+        (int(circle[0][0]), int(circle[0][1])),
+        int(circle[1] * 1.3),
+        (0, 0, 255),
+        thickness=1,
     )
     return frame
 
