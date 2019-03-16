@@ -10,18 +10,18 @@ from cscore import CameraServer
 from networktables import NetworkTablesInstance, NetworkTables
 
 # Magic Numbers
-lowerGreen = (50, 120, 130)  # Our Robot's Camera
-higherGreen = (100, 220, 220)
-minContourArea = 10
+lowerGreen = (70, 130, 90)  # Our Robot's Camera
+higherGreen = (85, 255, 205)
+minContourArea = 5
 angleOffset = 10
-rightAngleSize = -14
+rightAngleSize = -14.5
 leftAngleSize = -75.5
 screenX = 320
 screenY = 240
 screenSize = (screenX, screenY)
-distance_away = 110
 realTapeDistance = 0.2  # metres between closest tape points
-focal_length = 325
+focal_length = 325 * screenX / 320
+areaRatio = 0.5
 
 # Initialisation
 configFile = "/boot/frc.json"
