@@ -33,6 +33,8 @@ def test_video(path):
     if cap.isOpened() == False:
         print("Error opening video stream or file", file=sys.stderr)
         sys.exit()
+    for _ in range(2350):
+        _, _ = cap.read()
     while True:
         ret, frame = cap.read()
         result = getRetroPos(frame, True, hsv, mask)
