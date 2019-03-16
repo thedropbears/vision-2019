@@ -71,7 +71,7 @@ def getDistance(boxes):
         dist = (realTapeDistance * focal_length) / width
         return dist, offset
     else:
-        return math.nan, offset
+        return math.nan, math.nan
 
 
 def getOffset(width, x):
