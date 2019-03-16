@@ -110,21 +110,40 @@ def getRetroPos(frame: np.array, annotated: bool, hsv: np.array, mask: np.array)
     boxed_and_angles = []
     for rect in rects:
         if math.isclose(rect[2], leftAngleSize, abs_tol=angleOffset):
-            boxed_and_angles.append([False, np.array(cv2.boxPoints(rect)), cv2.contourArea(cv2.boxPoints(rect))])
+            boxed_and_angles.append(
+                [
+                    False,
+                    np.array(cv2.boxPoints(rect)),
+                    cv2.contourArea(cv2.boxPoints(rect)),
+                    max(rect[1]),
+                ]
+            )
         elif math.isclose(rect[2], rightAngleSize, abs_tol=angleOffset):
-            boxed_and_angles.append([True, np.array(cv2.boxPoints(rect)), cv2.contourArea(cv2.boxPoints(rect))])
+            boxed_and_angles.append(
+                [
+                    True,
+                    np.array(cv2.boxPoints(rect)),
+                    cv2.contourArea(cv2.boxPoints(rect)),
+                    max(rect[1]),
+                ]
+            )
 
     pairs = []
-    leftRect = None
+    leftRects = []
     for rect in sorted(
         boxed_and_angles, key=lambda x: max(x[1][:, 0]) if x[0] else min(x[1][:, 0])
     ):  # Get rectangle pairs
         if not rect[0]:
-            leftRect = rect
-        elif leftRect and math.isclose(leftRect[2], rect[2], abs_tol=0.3*leftRect[2]):
+            leftRects.append(rect)
+        elif len(leftRects) > 0:
+            for leftRect in leftRects:
+                if math.isclose(leftRect[2], rect[2], rel_tol=areaRatio) and math.isclose(rect[3] * 1.5, min(rect[1][:, 0]) - max(leftRect[1][:, 0]), rel_tol=0.5):
             pairs.append((leftRect, rect))
-            leftRect = None
-
+                    leftRects = []
+                    break
+        else:
+            pass
+        frame = cv2.drawContours(frame, np.int0([rect[1]]), 0, (255, 0, 255))
     if len(pairs) < 1:
         return frame, math.nan, math.nan
 
