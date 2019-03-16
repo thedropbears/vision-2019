@@ -92,7 +92,9 @@ def createAnnotatedDisplay(
     return frame
 
 
-def getRetroPos(frame: np.array, annotated: bool, hsv: np.array, mask: np.array) -> (np.array, float, float):
+def getRetroPos(
+    frame: np.array, annotated: bool, hsv: np.array, mask: np.array
+) -> (np.array, float, float):
     """Function for finding retro-reflective tape"""
 
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV, dst=hsv)
@@ -142,7 +144,7 @@ def getRetroPos(frame: np.array, annotated: bool, hsv: np.array, mask: np.array)
         elif len(leftRects) > 0:
             for leftRect in leftRects:
                 if math.isclose(leftRect[2], rect[2], rel_tol=areaRatio) and math.isclose(rect[3] * 1.5, min(rect[1][:, 0]) - max(leftRect[1][:, 0]), rel_tol=0.5):
-            pairs.append((leftRect, rect))
+                    pairs.append((leftRect, rect))
                     leftRects = []
                     break
         else:
@@ -150,10 +152,12 @@ def getRetroPos(frame: np.array, annotated: bool, hsv: np.array, mask: np.array)
         frame = cv2.drawContours(frame, np.int0([rect[1]]), 0, (255, 0, 255))
     if len(pairs) < 1:
         return frame, math.nan, math.nan
-
-    closestToMiddle = list(min(
-        pairs, key=lambda x: abs(np.mean([x[0][1][:,0] + x[1][1][:,0]]) - screenSize[0])
-    ))
+    closestToMiddle = list(
+        min(
+            pairs,
+            key=lambda x: abs(np.mean([x[0][1][:,0] + x[1][1][:,0]]) - screenSize[0]),
+        )
+    )
     closestToMiddle = [closestToMiddle[0][1], closestToMiddle[1][1]]
 
     (x, y), radius = cv2.minEnclosingCircle(np.array(closestToMiddle).reshape(-1, 2))
@@ -162,11 +166,7 @@ def getRetroPos(frame: np.array, annotated: bool, hsv: np.array, mask: np.array)
         frame = createAnnotatedDisplay(frame, ((x, y), radius))
 
     dist, offset = getDistance(closestToMiddle)
-    return (
-        frame,
-        dist,
-        offset,
-    )
+    return (frame, dist, offset)
 
 
 if __name__ == "__main__":
@@ -229,7 +229,12 @@ if __name__ == "__main__":
         else:
             image, dist, offset = getRetroPos(frame, True, hsv, mask)
         source.putFrame(image)
-        if not math.isnan(dist) and not dist < 0.6 and not dist > 3 and not abs(offset) > 2:
+        if (
+            not math.isnan(dist)
+            and not dist < 0.6
+            and not dist > 3
+            and not abs(offset) > 2
+        ):
             if game_piece == 1:
                 dist *= -1
                 offset *= -1
