@@ -7,22 +7,21 @@ import math
 import time
 from collections import namedtuple
 from cscore import CameraServer
-from networktables import NetworkTables
-
+from networktables import NetworkTablesInstance, NetworkTables
 
 # Magic Numbers
-lowerGreen = (50, 120, 130)  # Our Robot's Camera
-higherGreen = (100, 220, 220)
-minContourArea = 10
+lowerGreen = (70, 130, 90)  # Our Robot's Camera
+higherGreen = (85, 255, 205)
+minContourArea = 5
 angleOffset = 10
-rightAngleSize = -14
+rightAngleSize = -14.5
 leftAngleSize = -75.5
 screenX = 320
 screenY = 240
 screenSize = (screenX, screenY)
-distance_away = 110
 realTapeDistance = 0.2  # metres between closest tape points
-focal_length = 325
+focal_length = 325 * screenX / 320
+areaRatio = 0.5
 
 # Initialisation
 configFile = "/boot/frc.json"
@@ -72,35 +71,30 @@ def getDistance(boxes):
         dist = (realTapeDistance * focal_length) / width
         return dist, offset
     else:
-        return math.nan, offset
+        return math.nan, math.nan
 
 
 def getOffset(width, x):
-    # if width = 20cm then what is x in cm
     offset = x / (width / (realTapeDistance))
     return -offset
 
 
 def createAnnotatedDisplay(
-    frame: np.array, pairs: list, closestToMiddle: tuple, circle: tuple
+    frame: np.array, circle: tuple
 ) -> np.array:
-    frame = cv2.line(frame, (160, 0), (160, 240), (255, 0, 0), thickness=1)
-    for pair in pairs:
-        if (pair[0][1][0] == closestToMiddle[0][0]).all():
-            colour = (0, 255, 0) #Green
-            frame = cv2.circle(
-                frame, (int(circle[0][0]), int(circle[0][1])), int(circle[1]), colour
-            )
-        else:
-            colour = (0, 0, 255) #Red
-        for tape in pair:
-            frame = cv2.drawContours(
-                frame, [np.int0(tape[1])], 0, colour, thickness=2
-            )
+    frame = cv2.circle(
+        frame,
+        (int(circle[0][0]), int(circle[0][1])),
+        int(circle[1] * 1.3),
+        (0, 0, 255),
+        thickness=1,
+    )
     return frame
 
 
-def getRetroPos(frame: np.array, annotated: bool, hsv: np.array, mask: np.array) -> (np.array, float, float):
+def getRetroPos(
+    frame: np.array, annotated: bool, hsv: np.array, mask: np.array
+) -> (np.array, float, float):
     """Function for finding retro-reflective tape"""
 
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV, dst=hsv)
@@ -122,40 +116,57 @@ def getRetroPos(frame: np.array, annotated: bool, hsv: np.array, mask: np.array)
     boxed_and_angles = []
     for rect in rects:
         if math.isclose(rect[2], leftAngleSize, abs_tol=angleOffset):
-            boxed_and_angles.append([False, np.array(cv2.boxPoints(rect)), cv2.contourArea(cv2.boxPoints(rect))])
+            boxed_and_angles.append(
+                [
+                    False,
+                    np.array(cv2.boxPoints(rect)),
+                    cv2.contourArea(cv2.boxPoints(rect)),
+                    max(rect[1]),
+                ]
+            )
         elif math.isclose(rect[2], rightAngleSize, abs_tol=angleOffset):
-            boxed_and_angles.append([True, np.array(cv2.boxPoints(rect)), cv2.contourArea(cv2.boxPoints(rect))])
+            boxed_and_angles.append(
+                [
+                    True,
+                    np.array(cv2.boxPoints(rect)),
+                    cv2.contourArea(cv2.boxPoints(rect)),
+                    max(rect[1]),
+                ]
+            )
 
     pairs = []
-    leftRect = None
+    leftRects = []
     for rect in sorted(
         boxed_and_angles, key=lambda x: max(x[1][:, 0]) if x[0] else min(x[1][:, 0])
     ):  # Get rectangle pairs
         if not rect[0]:
-            leftRect = rect
-        elif leftRect and math.isclose(leftRect[2], rect[2], abs_tol=0.3*leftRect[2]):
-            pairs.append((leftRect, rect))
-            leftRect = None
-
+            leftRects.append(rect)
+        elif len(leftRects) > 0:
+            for leftRect in leftRects:
+                if math.isclose(leftRect[2], rect[2], rel_tol=areaRatio) and math.isclose(rect[3] * 1.5, min(rect[1][:, 0]) - max(leftRect[1][:, 0]), rel_tol=0.5):
+                    pairs.append((leftRect, rect))
+                    leftRects = []
+                    break
+        else:
+            pass
+        frame = cv2.drawContours(frame, np.int0([rect[1]]), 0, (255, 0, 255))
     if len(pairs) < 1:
         return frame, math.nan, math.nan
-
-    closestToMiddle = list(min(
-        pairs, key=lambda x: abs(np.mean([x[0][1][:,0] + x[1][1][:,0]]) - screenSize[0])
-    ))
+    closestToMiddle = list(
+        min(
+            pairs,
+            key=lambda x: abs(np.mean([x[0][1][:,0] + x[1][1][:,0]]) - screenSize[0]),
+        )
+    )
     closestToMiddle = [closestToMiddle[0][1], closestToMiddle[1][1]]
 
     (x, y), radius = cv2.minEnclosingCircle(np.array(closestToMiddle).reshape(-1, 2))
 
     if annotated:
-        frame = createAnnotatedDisplay(frame, pairs, closestToMiddle, ((x, y), radius))
+        frame = createAnnotatedDisplay(frame, ((x, y), radius))
 
     dist, offset = getDistance(closestToMiddle)
-    return (
-        frame,
-        dist,
-        offset,
-    )
+    return (frame, dist, offset)
 
 
 if __name__ == "__main__":
@@ -166,19 +177,23 @@ if __name__ == "__main__":
     cameraConfigs = readConfig()
 
     # start NetworkTables
+
+    ntinst = NetworkTablesInstance()
+    ntinst.startServer()
+    ntinst.setUpdateRate(1)
+
     NetworkTables.initialize(server="10.47.74.2")
-
     NetworkTables.setUpdateRate(1)
-    nt = NetworkTables.getTable("/vision")
-    ping = nt.getEntry("ping")
-    raspi_pong = nt.getEntry("raspi_pong")
-    rio_pong = nt.getEntry("rio_pong")
 
-    entry_game_piece = nt.getEntry("game_piece")
-    entry_dist = nt.getEntry("fiducial_x")
-    entry_offset = nt.getEntry("fiducial_y")
-    entry_fiducial_time = nt.getEntry("fiducial_time")
-    entry_camera = nt.getEntry("using_cargo_camera")
+    ping = ntinst.getEntry("/vision/ping")
+    raspi_pong = ntinst.getEntry("/vision/raspi_pong")
+    rio_pong = ntinst.getEntry("/vision/rio_pong")
+
+    entry_game_piece = ntinst.getEntry("/vision/game_piece")
+    entry_dist = ntinst.getEntry("/vision/fiducial_x")
+    entry_offset = ntinst.getEntry("/vision/fiducial_y")
+    entry_fiducial_time = ntinst.getEntry("/vision/fiducial_time")
+    entry_camera = ntinst.getEntry("/vision/using_cargo_camera")
 
     # start cameras
     cameras = []
@@ -194,7 +209,6 @@ if __name__ == "__main__":
     hsv = np.zeros(shape=(screenSize[1], screenSize[0], 3), dtype=np.uint8)
     mask = np.zeros(shape=(screenSize[1], screenSize[0]), dtype=np.uint8)
     img = np.zeros(shape=(screenSize[1], screenSize[0], 3), dtype=np.uint8)
-
     old_ping_time = 0
     while True:
         ping_time = ping.getNumber(0)
@@ -202,10 +216,10 @@ if __name__ == "__main__":
             raspi_pong.setNumber(time.monotonic())
             rio_pong.setNumber(ping_time)
             old_ping_time = ping_time
-        game_piece = entry_game_piece.getBoolean(0)
+        game_piece = entry_game_piece.getNumber(0)
         fiducial_time = time.monotonic()
         sink = hatch_sink if game_piece == 0 else cargo_rocket_sink
-        entry_camera.setBoolean(False if not game_piece else True)
+        entry_camera.setBoolean(bool(game_piece))
         frame_time, frame = sink.grabFrameNoTimeout(image=frame)
         if frame_time == 0:
             print(sink.getError(), file=sys.stderr)
@@ -215,11 +229,16 @@ if __name__ == "__main__":
         else:
             image, dist, offset = getRetroPos(frame, True, hsv, mask)
         source.putFrame(image)
-        if not math.isnan(dist):
+        if (
+            not math.isnan(dist)
+            and not dist < 0.6
+            and not dist > 3
+            and not abs(offset) > 2
+        ):
             if game_piece == 1:
                 dist *= -1
                 offset *= -1
             entry_dist.setNumber(dist)
             entry_offset.setNumber(offset)
             entry_fiducial_time.setNumber(fiducial_time)
-        NetworkTables.flush()
+        ntinst.flush()
